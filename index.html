@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Barcode & QR Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <meta name="theme-color" content="#21808D">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQmFyY29kZSBTY2FubmVyIiwic2hvcnRfbmFtZSI6IlNjYW5uZXIiLCJzdGFydF91cmwiOiIuLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwidGhlbWVfY29sb3IiOiIjMjE4MDhEIiwiYmFja2dyb3VuZF9jb2xvciI6IiNGQ0ZDRjkifQ==">
+</head>
+<body>
+    <div id="app" class="app">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="header__title">Barcode Scanner</h1>
+            <div class="header__controls">
+                <button id="historyBtn" class="btn btn--sm btn--outline" type="button">
+                    <span class="icon-history">📋</span> History
+                </button>
+                <button id="settingsBtn" class="btn btn--sm btn--outline" type="button">
+                    <span class="icon-settings">⚙️</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Scanner View -->
+        <main class="scanner-container">
+            <!-- Camera View -->
+            <div id="cameraView" class="camera-view">
+                <video id="scanner" class="camera-video" autoplay muted playsinline></video>
+                <canvas id="scannerCanvas" class="scanner-canvas"></canvas>
+                
+                <!-- Scanning Overlay -->
+                <div class="scan-overlay">
+                    <div class="scan-frame">
+                        <div class="scan-corners">
+                            <div class="corner corner--tl"></div>
+                            <div class="corner corner--tr"></div>
+                            <div class="corner corner--bl"></div>
+                            <div class="corner corner--br"></div>
+                        </div>
+                        <div class="scan-line"></div>
+                    </div>
+                    <p class="scan-instructions">Point your camera at a barcode or QR code</p>
+                </div>
+
+                <!-- Detection Feedback -->
+                <div id="detectionFeedback" class="detection-feedback hidden">
+                    <div class="detection-box"></div>
+                </div>
+            </div>
+
+            <!-- Camera Controls -->
+            <div class="camera-controls">
+                <button id="startBtn" class="btn btn--primary btn--lg" type="button">
+                    Start Scanning
+                </button>
+                <button id="stopBtn" class="btn btn--secondary btn--lg hidden" type="button">
+                    Stop Scanning
+                </button>
+                
+                <div class="control-buttons">
+                    <button id="flashBtn" class="btn btn--outline" type="button" disabled>
+                        <span class="icon-flash">🔦</span>
+                    </button>
+                    <button id="switchCameraBtn" class="btn btn--outline" type="button" disabled>
+                        <span class="icon-switch">🔄</span>
+                    </button>
+                    <button id="manualEntryBtn" class="btn btn--outline" type="button">
+                        <span class="icon-keyboard">⌨️</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state hidden">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Searching for product...</p>
+            </div>
+
+            <!-- Permission Request -->
+            <div id="permissionRequest" class="permission-request">
+                <div class="permission-content">
+                    <h2>Camera Access Required</h2>
+                    <p>This app needs access to your camera to scan barcodes and QR codes.</p>
+                    <button id="requestPermissionBtn" class="btn btn--primary btn--lg">
+                        Grant Camera Access
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state hidden">
+                <div class="error-content">
+                    <h2>Unable to Access Camera</h2>
+                    <p id="errorMessage">Camera access was denied or not available.</p>
+                    <div class="error-actions">
+                        <button id="retryBtn" class="btn btn--primary">Retry</button>
+                        <button id="manualModeBtn" class="btn btn--outline">Manual Entry</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Results Panel -->
+        <div id="resultsPanel" class="results-panel">
+            <div class="results-header">
+                <button id="closeResultsBtn" class="btn btn--sm btn--outline" type="button">✕</button>
+                <h3>Scan Results</h3>
+            </div>
+            <div class="results-content">
+                <div class="scan-info">
+                    <div class="scan-info__item">
+                        <label>Code:</label>
+                        <span id="scannedCode" class="code-value"></span>
+                        <button id="copyCodeBtn" class="btn btn--sm btn--outline" type="button">Copy</button>
+                    </div>
+                    <div class="scan-info__item">
+                        <label>Format:</label>
+                        <span id="codeFormat"></span>
+                    </div>
+                    <div class="scan-info__item">
+                        <label>Scanned:</label>
+                        <span id="scanTime"></span>
+                    </div>
+                </div>
+                
+                <div id="productInfo" class="product-info">
+                    <div class="product-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Searching for product details...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="results-actions">
+                <button id="scanAgainBtn" class="btn btn--primary btn--full-width" type="button">
+                    Scan Another
+                </button>
+            </div>
+        </div>
+
+        <!-- History Modal -->
+        <div id="historyModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Scan History</h2>
+                    <button id="closeHistoryBtn" class="btn btn--sm btn--outline" type="button">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div id="historyList" class="history-list">
+                        <p class="empty-history">No scans yet. Start scanning to see your history here.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="clearHistoryBtn" class="btn btn--secondary" type="button">Clear History</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button id="closeSettingsBtn" class="btn btn--sm btn--outline" type="button">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label class="form-label">Supported Formats</label>
+                        <div class="format-options">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="formatUPC" checked> UPC-A/E
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="formatEAN" checked> EAN-13/8
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="formatCode128" checked> Code-128
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="formatCode39" checked> Code-39
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="formatQR" checked> QR Code
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label class="form-label">Audio Feedback</label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="audioFeedback" checked> Play sound on successful scan
+                        </label>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label class="form-label">Auto Search</label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="autoSearch" checked> Automatically search for product details
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Entry Modal -->
+        <div id="manualModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manual Code Entry</h2>
+                    <button id="closeManualBtn" class="btn btn--sm btn--outline" type="button">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="manualCode">Enter Barcode/QR Code</label>
+                        <input type="text" id="manualCode" class="form-control" placeholder="e.g., 012345678905">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="manualFormat">Format</label>
+                        <select id="manualFormat" class="form-control">
+                            <option value="UPC-A">UPC-A</option>
+                            <option value="EAN-13">EAN-13</option>
+                            <option value="Code-128">Code-128</option>
+                            <option value="QR">QR Code</option>
+                            <option value="unknown">Unknown</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="submitManualBtn" class="btn btn--primary" type="button">Search Product</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
